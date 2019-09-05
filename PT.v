@@ -52,8 +52,10 @@ Section WP.
 End WP.
 
 Arguments wp {_} {_}.
+Hint Unfold wp.
 
 Notation "P ⊆ Q" := (subset P Q) (at level 42).
+Hint Unfold subset.
 
 Section Refinement.
 
@@ -76,6 +78,7 @@ Section Refinement.
 End Refinement.
 
 Arguments refinement {_} {_}.
+Hint Unfold refinement.
 
 Notation "pt1 ⊑ pt2" := (refinement pt1 pt2) (at level 42).
 
@@ -89,10 +92,10 @@ Lemma refinement_spec : forall A B (f g : A -> B),
     (wp f ⊑ wp g) <-> (forall x, f x = g x).
 Proof.
   intros. split.
-  - unfold wp, refinement, subset.
+  - autounfold.
     intros. apply leibniz. intros.
     specialize (H (fun _ => P)). simpl in H. auto.
-  - intros. unfold refinement, subset, wp.
+  - intros. autounfold.
     intros. rewrite <- H. assumption.
 Qed.
 
@@ -165,6 +168,9 @@ Section WP_Partial.
 End WP_Partial.
 
 Arguments wpPartial {_} {_}.
+Hint Unfold wpPartial.
+
+Hint Unfold mustPT.
 
 Definition toNat (x : Type) : Type := nat.
 
@@ -175,8 +181,8 @@ Fixpoint safeDiv (e : Expr) : Prop :=
     ~step_rel e2 O /\ safeDiv e1 /\ safeDiv e2
   end.
 
-Ltac unfoldPartial :=
-  unfold wpPartial, mustPT, wp; simpl.
+Ltac autounfold_with_tac tac  :=
+  repeat (autounfold; tac).
 
 Ltac comp_analysis e1 e2 :=
   let He1 := fresh "He1" in
@@ -202,7 +208,7 @@ Lemma wpPartial_div : forall e1 e2,
     @wpPartial _ toNat interp step_rel (Div e1 e2).
 Proof.
   intros e1 e2.
-  unfoldPartial.
+  autounfold_with_tac simpl.
   comp_analysis e1 e2.
   partial_div_analysis.
 Qed.
@@ -219,12 +225,14 @@ Qed.
 Definition dom {X F} (f : X -> PartialF (F X)) : X -> Prop :=
   wpPartial f (fun _ _ => True).
 
+Hint Unfold dom.
+
 Lemma sound : @dom _ toNat interp ⊆ @wpPartial _ toNat interp step_rel.
 Proof.
   intros e. induction e.
   - cbv. constructor.
   - revert IHe1 IHe2.
-    unfold dom; unfoldPartial.
+    autounfold_with_tac simpl.
     comp_analysis e1 e2.
     partial_div_analysis.
 Qed.
@@ -233,16 +241,19 @@ Lemma complete : @wpPartial _ toNat interp step_rel ⊆ @dom _ toNat interp.
 Proof.
   intros e. induction e.
   - cbv. constructor.
-  - unfold dom; unfoldPartial.
+  - autounfold_with_tac simpl.
     comp_analysis e1 e2.
     partial_div_analysis.
 Qed.
+
+Hint Unfold subset.
+Hint Unfold refinement.
 
 Lemma refinement_spec_partial {A B} : forall (f g : A -> PartialF B),
     (wpPartial f ⊑ wpPartial g) <-> (forall x, (f x = g x) \/ (f x = abort)).
 Proof.
   intros f g. split.
-  - unfold refinement, subset; unfoldPartial. intros.
+  - autounfold_with_tac simpl. intros.
     specialize (H (fun x a => f x = Ret a \/ f x = abort) x).
     simpl in H. 
     remember (f x) as fx.
@@ -254,7 +265,7 @@ Proof.
     + right. destruct p. unfold abort.
       f_equal. (* Can I do this without extensionality? *)
       extensionality a. destruct a.
-  - unfold refinement, subset; unfoldPartial. intros.
+  - autounfold_with_tac simpl. intros.
     specialize (H x). destruct H.
     + rewrite <- H. assumption.
     + rewrite H in H0. simpl in H0. destruct H0.
@@ -305,9 +316,8 @@ Definition toListNat (_ : list nat) := list nat.
 Lemma correctness : @wpSpec (list nat) (fun _ => list nat) addSpec
                             ⊑ @wpPartial _ (fun _ => list nat) add.
 Proof.
-  intros P l. unfold wpSpec, wpPartial, addSpec. simpl.
-  unfold subset. intros [H1 H2]. unfold wp, mustPT.
-  destruct l.
+  intros P l. autounfold_with_tac simpl.
+  intros [H1 H2]. destruct l.
   - simpl. inversion H1.
   - unfold add. simpl. destruct l.
     + inversion H1. inversion H0.
